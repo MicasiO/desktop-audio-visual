@@ -5,8 +5,10 @@
 #include "gio/gio.h"
 #include "glib-object.h"
 #include "glib.h"
+#include "glibconfig.h"
 #include "gtk/gtk.h"
 #include "gtk4-layer-shell.h"
+#include "utils.h"
 
 static gboolean on_tick(GtkWidget* widget, GdkFrameClock* frame_clock, gpointer user_data) {
     gtk_widget_queue_draw(widget);
@@ -15,41 +17,28 @@ static gboolean on_tick(GtkWidget* widget, GdkFrameClock* frame_clock, gpointer 
 }
 
 static void draw(GtkDrawingArea* area, cairo_t* cr, int width, int height, gpointer user_data) {
-    BarHeights* bar_heights = user_data;
+    AppState* app_state = (AppState*)user_data;
 
     cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
 
-    draw_bars(cr, 0, 0, width, height, false, bar_heights->left);
-    draw_bars(cr, width, 0, width, height, true, bar_heights->right);
-    cairo_fill(cr);
+    draw_bars(cr, 0, 0, width, height, false, app_state->bar_heights.left);
+    draw_bars(cr, width, 0, width, height, true, app_state->bar_heights.right);
+    // cairo_fill(cr);
 }
 
 static void
 draw_bars(cairo_t* cr, int x, int y, int width, int height, bool flipped, float bars[BAR_COUNT]) {
-    float bar_thickness = (float)height / 2 / (int)BAR_COUNT;
+    cairo_save(cr);
 
+    cairo_translate(cr, x, y + (int)(height / 2.0f));
+
+    float bar_thickness = (float)height / 2.0f / (int)BAR_COUNT;
     float max_width = (float)width / 3.0f;
 
-    float top_y = (float)height / 2.0f - ((int)BAR_COUNT - 1) * bar_thickness;
-    cairo_move_to(cr, x, top_y + y);
-
-    for (int i = BAR_COUNT - 1; i >= 0; i--) {
-        float pos_y = (float)height / 2.0f - i * bar_thickness;
-
-        float percentage = bars[i] / (FRAMES / 4.0f);
-        percentage *= SENSITIVITY;
-        if (percentage > 1.0f)
-            percentage = 1.0f;
-
-        float bar_width = percentage * max_width;
-        bar_width = flipped ? -bar_width : bar_width;
-
-        cairo_line_to(cr, x + bar_width, pos_y + y);
-        // cairo_rectangle(cr, x, pos_y + y, bar_width, bar_thickness);
-    }
+    // cairo_move_to(cr, 0, 0);
 
     for (int i = 0; i < BAR_COUNT; i++) {
-        float pos_y = (float)height / 2.0f + i * bar_thickness;
+        float pos_y = i * bar_thickness;
 
         float percentage = bars[i] / (FRAMES / 4.0f);
         percentage *= SENSITIVITY;
@@ -59,18 +48,31 @@ draw_bars(cairo_t* cr, int x, int y, int width, int height, bool flipped, float 
         float bar_width = percentage * max_width;
         bar_width = flipped ? -bar_width : bar_width;
 
-        cairo_line_to(cr, x + bar_width, pos_y + y);
+        cairo_rectangle(cr, x, pos_y, (int)bar_width, bar_thickness);
 
-        // cairo_rectangle(cr, x, pos_y + y, bar_width, bar_thickness);
+        // if (i == 0) {
+        //     cairo_move_to(cr, (int)bar_width, (int)pos_y);
+        // } else {
+        //     cairo_line_to(cr, (int)bar_width, (int)pos_y);
+        // }
     }
 
-    float bottom_y = (float)height / 2.0f + ((int)BAR_COUNT - 1) * bar_thickness;
-    cairo_line_to(cr, x, bottom_y + y);
+    cairo_path_t* saved_path = cairo_copy_path(cr);
+
+    cairo_scale(cr, 1.0, -1.0);
+
+    cairo_append_path(cr, saved_path);
+
+    cairo_fill(cr);
+
+    cairo_path_destroy(saved_path);
+
+    cairo_restore(cr);
 }
 
 static void create_window_for_monitor(GtkApplication* app,
                                       GdkMonitor* monitor,
-                                      BarHeights* bar_heights) {
+                                      AppState* app_state) {
     GtkWindow* gtk_window = GTK_WINDOW(gtk_application_window_new(app));
 
     gtk_layer_init_for_window(gtk_window);
@@ -94,14 +96,14 @@ static void create_window_for_monitor(GtkApplication* app,
     }
 
     GtkWidget* draw_area = gtk_drawing_area_new();
-    gtk_widget_add_tick_callback(draw_area, on_tick, bar_heights, NULL);
-    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(draw_area), draw, bar_heights, NULL);
+    gtk_widget_add_tick_callback(draw_area, on_tick, app_state, NULL);
+    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(draw_area), draw, app_state, NULL);
 
     gtk_window_set_child(gtk_window, draw_area);
     gtk_window_present(gtk_window);
 }
 
-void activate(GtkApplication* app, BarHeights* bar_heights) {
+void activate(GtkApplication* app, AppState* app_state) {
     GtkCssProvider* css_provider = gtk_css_provider_new();
     const char* css_data =
         "window {\n"
@@ -115,7 +117,7 @@ void activate(GtkApplication* app, BarHeights* bar_heights) {
                                                GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(css_provider);
 
-    g_object_set_data(G_OBJECT(app), "bar_heights", bar_heights);
+    g_object_set_data(G_OBJECT(app), "app_state", app_state);
 
     GdkDisplay* display = gdk_display_get_default();
     GListModel* monitors = gdk_display_get_monitors(display);
@@ -124,7 +126,7 @@ void activate(GtkApplication* app, BarHeights* bar_heights) {
 
     for (guint i = 0; i < g_list_model_get_n_items(monitors); i++) {
         GdkMonitor* monitor = g_list_model_get_item(monitors, i);
-        create_window_for_monitor(app, monitor, bar_heights);
+        create_window_for_monitor(app, monitor, app_state);
         g_object_unref(monitor);
     }
 }
@@ -136,12 +138,12 @@ static void on_monitors_changed(GListModel* monitors,
                                 gpointer user_data) {
     GtkApplication* app = GTK_APPLICATION(user_data);
 
-    BarHeights* bar_heights = g_object_get_data(G_OBJECT(app), "bar_heights");
+    AppState* app_state = g_object_get_data(G_OBJECT(app), "app_state");
 
     for (guint i = 0; i < added; i++) {
         GdkMonitor* new_monitor = g_list_model_get_item(monitors, position + i);
 
-        create_window_for_monitor(app, new_monitor, bar_heights);
+        create_window_for_monitor(app, new_monitor, app_state);
 
         g_object_unref(new_monitor);
     }

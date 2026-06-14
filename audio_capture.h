@@ -8,7 +8,7 @@
 #define FRAMES BUFF_SIZE
 #define BINS (FRAMES / 2 + 1)
 
-#define BAR_SCALE 5
+#define BAR_SCALE 4
 #define BAR_COUNT (BINS / BAR_SCALE)
 
 typedef struct AudioData {

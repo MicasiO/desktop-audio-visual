@@ -6,7 +6,6 @@
 #include <pulse/sample.h>
 #include <pulse/simple.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <unistd.h>
 #include "utils.h"
 
@@ -37,7 +36,6 @@ void audio_capture_init(AudioData* data) {
 
     data->left_plan = fftwf_plan_dft_r2c_1d(FRAMES, data->in, data->left_out, FFTW_MEASURE);
     data->right_plan = fftwf_plan_dft_r2c_1d(FRAMES, data->in, data->right_out, FFTW_MEASURE);
-    printf("stuff\n");
 }
 
 void audio_capture_buffer(AudioData* data) {

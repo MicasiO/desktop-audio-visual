@@ -11,6 +11,9 @@
 typedef struct AppState {
     AudioData audio_data;
     BarHeights bar_heights;
+    bool data_changed;
+    pthread_mutex_t mutex;
+    cairo_surface_t* background_cache;
 } AppState;
 
 void die(const char* msg);

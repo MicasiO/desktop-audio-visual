@@ -7,6 +7,8 @@
 
 #define SENSITIVITY 4.0f
 
+typedef struct AppState AppState;
+
 typedef struct BarHeights {
     float left[BAR_COUNT];
     float right[BAR_COUNT];
@@ -19,11 +21,11 @@ static void draw(GtkDrawingArea* area, cairo_t* cr, int width, int height, gpoin
 static void
 draw_bars(cairo_t* cr, int x, int y, int width, int height, bool flipped, float bars[BAR_COUNT]);
 
-void activate(GtkApplication* app, BarHeights* bar_heights);
+void activate(GtkApplication* app, AppState* app_state);
 
 static void create_window_for_monitor(GtkApplication* app,
                                       GdkMonitor* monitor,
-                                      BarHeights* bar_heights);
+                                      AppState* app_state);
 
 static void on_monitors_changed(GListModel* monitors,
                                 guint position,
