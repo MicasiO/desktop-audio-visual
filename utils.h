@@ -4,6 +4,10 @@
 #include "audio_capture.h"
 #include "drawing.h"
 
+// TODO: create config (color, sensitivity, bars/lines, filled/not filled, scaling, show on
+// displays, hide when app opened)
+// optimize
+
 typedef struct AppState {
     AudioData audio_data;
     BarHeights bar_heights;

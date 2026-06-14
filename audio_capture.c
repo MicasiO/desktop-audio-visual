@@ -82,16 +82,43 @@ void* audio_process(void* arg) {
     AppState* app_state = arg;
     AudioData* audio_data = &app_state->audio_data;
 
+    float raw_bars_left[BINS] = {0};
+    float raw_bars_right[BINS] = {0};
+
     while (true) {
         audio_capture_buffer(audio_data);
 
         calc_fftw(&audio_data->left_plan, audio_data->in, audio_data->left_out,
-                  audio_data->left_audio_buffer, app_state->bar_heights.left);
+                  audio_data->left_audio_buffer, raw_bars_left);
         calc_fftw(&audio_data->right_plan, audio_data->in, audio_data->right_out,
-                  audio_data->right_audio_buffer, app_state->bar_heights.right);
+                  audio_data->right_audio_buffer, raw_bars_right);
+
+        scale_bars(raw_bars_left, app_state->bar_heights.left);
+        scale_bars(raw_bars_right, app_state->bar_heights.right);
     }
 
     return NULL;
+}
+
+void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]) {
+    for (int i = 0; i < BAR_COUNT; i++) {
+        float start_freq_percent = powf((float)i / (int)BAR_COUNT, 2.0f);
+        float end_freq_percent = powf((float)(i + 1) / (int)BAR_COUNT, 2.0f);
+
+        int start_bin = start_freq_percent * ((int)BINS - 1) + 1;
+        int end_bin = end_freq_percent * ((int)BINS - 1) + 1;
+
+        if (end_bin <= start_bin) {
+            end_bin = start_bin + 1;
+        }
+
+        float sum = 0.0f;
+        for (int j = start_bin; j < end_bin; j++) {
+            sum += bars_in[j];
+        }
+
+        bars_out[i] = sum / (end_bin - start_bin);
+    }
 }
 
 void free_audio_data(AudioData* data) {
