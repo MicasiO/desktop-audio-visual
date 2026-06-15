@@ -3,8 +3,11 @@
 #include <pthread.h>
 #include <pulse/def.h>
 #include <pulse/error.h>
+#include <pulse/pulseaudio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <unistd.h>
+#include "drawing.h"
 #include "utils.h"
 
 static void audio_capture_buffer(AudioData* data);
@@ -15,7 +18,29 @@ static void calc_fftw(fftwf_plan* plan,
                       float bar_heights[BINS]);
 static void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]);
 
-void audio_capture_init(AudioData* data) {
+void audio_capture_init(AppState* app_state) {
+    AudioData* data = &app_state->audio_data;
+
+    while (app_state->running) {
+        pthread_mutex_lock(&data->device_mutex);
+        if (data->device_name != NULL) {
+            pthread_mutex_unlock(&data->device_mutex);
+            break;
+        }
+
+        pthread_mutex_unlock(&data->device_mutex);
+        usleep(10000);
+    }
+
+    if (!app_state->running) {
+        return;
+    }
+
+    pthread_mutex_lock(&data->device_mutex);
+    char* current_monitor = strdup(data->device_name);
+    data->device_changed = false;
+    pthread_mutex_unlock(&data->device_mutex);
+
     int error;
     static const pa_sample_spec ss = {.format = PA_SAMPLE_FLOAT32LE, .rate = 44100, .channels = 2};
 
@@ -24,13 +49,10 @@ void audio_capture_init(AudioData* data) {
     attr.tlength = (uint32_t)-1;
     attr.prebuf = (uint32_t)-1;
     attr.minreq = (uint32_t)-1;
-
     attr.fragsize = sizeof(float) * BUFF_SIZE * 2;
 
-    data->stream = pa_simple_new(
-        NULL, "audio-visual", PA_STREAM_RECORD,
-        "alsa_output.usb-Lenovo_ThinkPad_USB-C_Dock_Audio_000000000000-00.analog-stereo.monitor",
-        "capture", &ss, NULL, &attr, &error);
+    data->stream = pa_simple_new(NULL, "audio-visual", PA_STREAM_RECORD, current_monitor, "capture",
+                                 &ss, NULL, &attr, &error);
     if (data->stream == NULL) {
         die(pa_strerror(error));
     }
@@ -67,6 +89,7 @@ void* audio_process(void* arg) {
 }
 
 void free_audio_data(AudioData* data) {
+    free(data->device_name);
     pa_simple_free(data->stream);
     fftwf_free(data->in);
     fftwf_destroy_plan(data->left_plan);

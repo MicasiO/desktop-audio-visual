@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <pulse/simple.h>
 #include "app.h"
+#include "audio_device.h"
 #include "gio/gio.h"
 #include "utils.h"
 
@@ -11,9 +12,13 @@ int main(int argc, char** argv) {
     AppState app_state = {0};
     app_state.running = true;
 
-    audio_capture_init(&app_state.audio_data);
+    pthread_mutex_init(&app_state.audio_data.device_mutex, NULL);
+    pthread_t audio_device_thread;
+    pthread_create(&audio_device_thread, NULL, audio_device_listener, &app_state.audio_data);
 
-    pthread_mutex_init(&app_state.mutex, NULL);
+    audio_capture_init(&app_state);
+
+    pthread_mutex_init(&app_state.data_mutex, NULL);
     pthread_t audio_capture_thread;
     pthread_create(&audio_capture_thread, NULL, audio_process, &app_state);
 
@@ -26,7 +31,7 @@ int main(int argc, char** argv) {
     app_state.running = false;
     pthread_join(audio_capture_thread, NULL);
 
-    pthread_mutex_destroy(&app_state.mutex);
+    pthread_mutex_destroy(&app_state.data_mutex);
     free_audio_data(&app_state.audio_data);
     return status;
 }
