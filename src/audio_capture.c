@@ -3,11 +3,17 @@
 #include <pthread.h>
 #include <pulse/def.h>
 #include <pulse/error.h>
-#include <pulse/sample.h>
-#include <pulse/simple.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include "utils.h"
+
+static void audio_capture_buffer(AudioData* data);
+static void calc_fftw(fftwf_plan* plan,
+                      float* in,
+                      fftwf_complex* out,
+                      float audio_buffer[BUFF_SIZE],
+                      float bar_heights[BINS]);
+static void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]);
 
 void audio_capture_init(AudioData* data) {
     int error;
@@ -38,44 +44,6 @@ void audio_capture_init(AudioData* data) {
     data->right_plan = fftwf_plan_dft_r2c_1d(FRAMES, data->in, data->right_out, FFTW_MEASURE);
 }
 
-void audio_capture_buffer(AudioData* data) {
-    int error;
-    float buf[BUFF_SIZE * 2];
-
-    if (pa_simple_read(data->stream, buf, sizeof(buf), &error) < 0) {
-        die(pa_strerror(error));
-    }
-
-    for (int i = 0; i < BUFF_SIZE; i++) {
-        int j = i * 2;
-        data->left_audio_buffer[i] = buf[j];
-        data->right_audio_buffer[i] = buf[j + 1];
-    }
-}
-
-void calc_fftw(fftwf_plan* plan,
-               float* in,
-               fftwf_complex* out,
-               float audio_buffer[BUFF_SIZE],
-               float bar_heights[BINS]) {
-    for (int i = 0; i < FRAMES; i++) {
-        float sample = audio_buffer[i];
-
-        float multiplier =
-            0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / ((float)FRAMES - 1.0f)));
-
-        in[i] = sample * multiplier;
-    }
-
-    fftwf_execute(*plan);
-    for (int i = 0; i < BINS; i++) {
-        float real = out[i][0];
-        float imag = out[i][1];
-
-        bar_heights[i] = sqrtf((real * real) + (imag * imag));
-    }
-}
-
 void* audio_process(void* arg) {
     AppState* app_state = arg;
     AudioData* audio_data = &app_state->audio_data;
@@ -83,7 +51,7 @@ void* audio_process(void* arg) {
     float raw_bars_left[BINS] = {0};
     float raw_bars_right[BINS] = {0};
 
-    while (true) {
+    while (app_state->running) {
         audio_capture_buffer(audio_data);
 
         calc_fftw(&audio_data->left_plan, audio_data->in, audio_data->left_out,
@@ -98,7 +66,17 @@ void* audio_process(void* arg) {
     return NULL;
 }
 
-void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]) {
+void free_audio_data(AudioData* data) {
+    pa_simple_free(data->stream);
+    fftwf_free(data->in);
+    fftwf_destroy_plan(data->left_plan);
+    fftwf_destroy_plan(data->right_plan);
+    fftwf_free(data->left_out);
+    fftwf_free(data->right_out);
+}
+
+// perform audio data scaling based on BAR_SCALE
+static void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]) {
     for (int i = 0; i < BAR_COUNT; i++) {
         float start_freq_percent = powf((float)i / (int)BAR_COUNT, 2.0f);
         float end_freq_percent = powf((float)(i + 1) / (int)BAR_COUNT, 2.0f);
@@ -119,11 +97,42 @@ void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]) {
     }
 }
 
-void free_audio_data(AudioData* data) {
-    pa_simple_free(data->stream);
-    fftwf_free(data->in);
-    fftwf_destroy_plan(data->left_plan);
-    fftwf_destroy_plan(data->right_plan);
-    fftwf_free(data->left_out);
-    fftwf_free(data->right_out);
+// get raw audio data
+static void audio_capture_buffer(AudioData* data) {
+    int error;
+    float buf[BUFF_SIZE * 2];
+
+    if (pa_simple_read(data->stream, buf, sizeof(buf), &error) < 0) {
+        die(pa_strerror(error));
+    }
+
+    for (int i = 0; i < BUFF_SIZE; i++) {
+        int j = i * 2;
+        data->left_audio_buffer[i] = buf[j];
+        data->right_audio_buffer[i] = buf[j + 1];
+    }
+}
+
+// fourier trasform calculations
+static void calc_fftw(fftwf_plan* plan,
+                      float* in,
+                      fftwf_complex* out,
+                      float audio_buffer[BUFF_SIZE],
+                      float bar_heights[BINS]) {
+    for (int i = 0; i < FRAMES; i++) {
+        float sample = audio_buffer[i];
+
+        float multiplier =
+            0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / ((float)FRAMES - 1.0f)));
+
+        in[i] = sample * multiplier;
+    }
+
+    fftwf_execute(*plan);
+    for (int i = 0; i < BINS; i++) {
+        float real = out[i][0];
+        float imag = out[i][1];
+
+        bar_heights[i] = sqrtf((real * real) + (imag * imag));
+    }
 }

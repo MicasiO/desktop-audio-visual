@@ -8,7 +8,7 @@
 #define FRAMES BUFF_SIZE
 #define BINS (FRAMES / 2 + 1)
 
-#define BAR_SCALE 4
+#define BAR_SCALE 10
 #define BAR_COUNT (BINS / BAR_SCALE)
 
 typedef struct AudioData {
@@ -26,18 +26,9 @@ typedef struct AudioData {
 } AudioData;
 
 void audio_capture_init(AudioData* data);
-void audio_capture_buffer(AudioData* data);
-
-void calc_fftw(fftwf_plan* plan,
-               float* in,
-               fftwf_complex* out,
-               float audio_buffer[BUFF_SIZE],
-               float bar_heights[BINS]);
-
-void scale_bars(float bars_in[BINS], float bars_out[BAR_COUNT]);
-
-void free_audio_data(AudioData* data);
 
 void* audio_process(void* arg);
+
+void free_audio_data(AudioData* data);
 
 #endif

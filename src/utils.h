@@ -6,14 +6,16 @@
 
 // TODO: create config (color, sensitivity, bars/lines, filled/not filled, scaling, show on
 // displays, hide when app opened)
-// optimize
+//  automatically select audio monitor
+//  static functions
+//
 
 typedef struct AppState {
     AudioData audio_data;
     BarHeights bar_heights;
-    bool data_changed;
     pthread_mutex_t mutex;
-    cairo_surface_t* background_cache;
+    bool data_changed;
+    bool running;
 } AppState;
 
 void die(const char* msg);
