@@ -21,7 +21,7 @@ void* audio_device_listener(void* arg) {
         die("pa_mainloop");
     }
 
-    pa_context* context = pa_context_new(pa_mainloop_get_api(mainloop), "audio-visual");
+    pa_context* context = pa_context_new(pa_mainloop_get_api(mainloop), "desktop-audio-visual");
     if (context == NULL) {
         pa_mainloop_free(mainloop);
         die("pa_context");

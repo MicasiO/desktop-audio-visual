@@ -2,12 +2,14 @@
 #define UITLS_H
 
 #include "audio_capture.h"
+#include "config.h"
 #include "drawing.h"
 
-// TODO: create config (color, sensitivity, bars/lines, filled/not filled, scaling, show on
-// displays, hide when app opened)
+// TODO: create config (color, sensitivity, bars/lines, filled/not filled, scaling)
 
 typedef struct AppState {
+    Config config;
+
     AudioData audio_data;
     BarHeights bar_heights;
 
@@ -18,5 +20,7 @@ typedef struct AppState {
 } AppState;
 
 void die(const char* msg);
+
+void free_app_state(AppState* app_state);
 
 #endif

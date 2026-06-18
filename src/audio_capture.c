@@ -5,6 +5,7 @@
 #include <pulse/error.h>
 #include <pulse/pulseaudio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "drawing.h"
@@ -53,6 +54,8 @@ void audio_capture_init(AppState* app_state) {
 
     data->stream = pa_simple_new(NULL, "audio-visual", PA_STREAM_RECORD, current_monitor, "capture",
                                  &ss, NULL, &attr, &error);
+    free(current_monitor);
+
     if (data->stream == NULL) {
         die(pa_strerror(error));
     }
@@ -89,7 +92,9 @@ void* audio_process(void* arg) {
 }
 
 void free_audio_data(AudioData* data) {
-    free(data->device_name);
+    if (data->device_name != NULL) {
+        free(data->device_name);
+    }
     pa_simple_free(data->stream);
     fftwf_free(data->in);
     fftwf_destroy_plan(data->left_plan);

@@ -25,6 +25,8 @@ void activate(GtkApplication* app, AppState* app_state) {
     // g_object_set_data(G_OBJECT(app), "app_state", app_state);
 
     create_window(app, app_state);
+
+    g_timeout_add_seconds(5, (GSourceFunc)g_application_quit, app);
 }
 
 static void create_window(GtkApplication* app, AppState* app_state) {

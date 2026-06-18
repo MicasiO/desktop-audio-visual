@@ -5,12 +5,15 @@
 #include <pulse/simple.h>
 #include "app.h"
 #include "audio_device.h"
+#include "config.h"
 #include "gio/gio.h"
 #include "utils.h"
 
 int main(int argc, char** argv) {
     AppState app_state = {0};
     app_state.running = true;
+
+    init_config(&app_state.config);
 
     pthread_mutex_init(&app_state.audio_data.device_mutex, NULL);
     pthread_t audio_device_thread;
@@ -23,7 +26,7 @@ int main(int argc, char** argv) {
     pthread_create(&audio_capture_thread, NULL, audio_process, &app_state);
 
     GtkApplication* app =
-        gtk_application_new("com.collmike.audio-visual", G_APPLICATION_NON_UNIQUE);
+        gtk_application_new("com.collmike.desktop-audio-visual", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), &app_state);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
@@ -32,6 +35,7 @@ int main(int argc, char** argv) {
     pthread_join(audio_capture_thread, NULL);
 
     pthread_mutex_destroy(&app_state.data_mutex);
-    free_audio_data(&app_state.audio_data);
+
+    free_app_state(&app_state);
     return status;
 }
